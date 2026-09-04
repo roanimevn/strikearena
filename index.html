@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>STRIKE ARENA — Football 3D</title>
+<style>
+  :root{
+    --pitch-dark: #06140b;
+    --ink: #08120c;
+    --paper: #eef3ea;
+    --flood: #fff3d6;
+    --gold: #d9b25c;
+    --gold-dim: #8a7038;
+    --red: #c0392b;
+    --blue-team: #2b6fc0;
+    --grey-team: #b23c3c;
+    --panel: rgba(6, 18, 10, 0.72);
+    --panel-edge: rgba(217, 178, 92, 0.35);
+    --font-display: 'Oswald', 'Arial Narrow', sans-serif;
+    --font-body: 'Rajdhani', 'Segoe UI', sans-serif;
+  }
+
+  @font-face {
+    font-family: 'Oswald';
+    src: local('Oswald');
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: var(--ink);
+    font-family: var(--font-body), sans-serif;
+    color: var(--paper);
+    touch-action: none;
+    overscroll-behavior: none;
+  }
+
+  #app { position: fixed; inset: 0; width: 100%; height: 100%; }
+  canvas#gl { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+  /* ============ LOADING ============ */
+  #loading {
+    position: fixed; inset: 0; z-index: 200;
+    background: radial-gradient(ellipse at center, #0b2013 0%, #050c08 75%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: opacity 0.6s ease;
+  }
+  #loading .logo {
+    font-family: var(--font-display), sans-serif;
+    font-size: clamp(36px, 8vw, 64px);
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: var(--gold);
+    text-shadow: 0 0 40px rgba(217,178,92,0.4);
+    margin-bottom: 8px;
+  }
+  #loading .sub {
+    font-size: 13px;
+    letter-spacing: 6px;
+    color: rgba(238,243,234,0.5);
+    margin-bottom: 40px;
+  }
+  #loading .bar-track {
+    width: min(360px, 70vw); height: 3px;
+    background: rgba(238,243,234,0.12);
+    border-radius: 2px; overflow: hidden;
+  }
+  #loading .bar-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    transition: width 0.25s ease;
+  }
+  #loading .pct { margin-top: 14px; font-size: 12px; color: rgba(238,243,234,0.4); letter-spacing: 2px; }
+
+  /* ============ MAIN MENU ============ */
+  #menu {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column;
+    background:
+      linear-gradient(180deg, rgba(5,10,7,0.35) 0%, rgba(5,10,7,0.75) 65%, rgba(4,8,5,0.94) 100%),
+      var(--ink);
+  }
+  #menu.hidden { display: none; }
+  #menuCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+
+  .menu-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: clamp(16px, 3vw, 36px) clamp(16px, 4vw, 48px) 0;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .brand .crest {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: conic-gradient(from 180deg, var(--gold), #7a5f2b, var(--gold));
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--ink);
+    box-shadow: 0 0 0 2px rgba(217,178,92,0.5), 0 4px 18px rgba(0,0,0,0.5);
+  }
+  .brand .name {
+    font-family: var(--font-display); font-weight: 700; letter-spacing: 3px;
+    font-size: clamp(18px, 2.4vw, 24px); color: var(--paper);
+  }
+  .brand .name span { color: var(--gold); }
+
+  .menu-body {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 0 clamp(16px, 4vw, 48px);
+  }
+
+  .menu-title {
+    font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(42px, 9vw, 96px);
+    line-height: 0.92;
+    letter-spacing: 1px;
+    color: var(--paper);
+    text-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    margin: 0 0 6px;
+  }
+  .menu-title .accent { color: var(--gold); }
+  .menu-kicker {
+    font-size: 13px; letter-spacing: 5px; color: rgba(238,243,234,0.55);
+    margin-bottom: clamp(28px, 5vw, 48px);
+  }
+
+  nav.menu-nav {
+    display: flex; flex-direction: column; gap: 2px;
+    max-width: 420px;
+  }
+  nav.menu-nav button {
+    all: unset; cursor: pointer;
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 4px; border-bottom: 1px solid rgba(238,243,234,0.12);
+    font-family: var(--font-display); font-size: clamp(20px, 3.2vw, 26px);
+    font-weight: 500; letter-spacing: 1px; color: rgba(238,243,234,0.85);
+    transition: color 0.15s ease, padding-left 0.15s ease, border-color 0.15s ease;
+    position: relative;
+  }
+  nav.menu-nav button .idx {
+    font-family: var(--font-body); font-size: 13px; color: var(--gold-dim);
+    min-width: 22px;
+  }
+  nav.menu-nav button:hover, nav.menu-nav button:active {
+    color: var(--paper); padding-left: 14px; border-color: var(--gold);
+  }
+  nav.menu-nav button:hover .idx, nav.menu-nav button:active .idx { color: var(--gold); }
+  nav.menu-nav button.primary { color: var(--gold); }
+  nav.menu-nav button.primary .idx { color: var(--gold); }
+  nav.menu-nav button:disabled { opacity: 0.35; cursor: not-allowed; }
+  nav.menu-nav button:disabled:hover { padding-left: 4px; color: rgba(238,243,234,0.85); border-color: rgba(238,243,234,0.12); }
+
+  .menu-bottom {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0 clamp(16px, 4vw, 48px) clamp(16px, 3vw, 32px);
+    font-size: 11px; letter-spacing: 2px; color: rgba(238,243,234,0.35);
+  }
+
+  /* ============ SETTINGS / SUB PANELS ============ */
+  .panel-screen {
+    position: fixed; inset: 0; z-index: 110;
+    background: rgba(4,8,5,0.92);
+    backdrop-filter: blur(6px);
+    display: none; flex-direction: column;
+    padding: clamp(16px,3vw,40px);
+  }
+  .panel-screen.active { display: flex; }
+  .panel-header {
+    display: flex; align-items: center; gap: 16px; margin-bottom: 24px;
+  }
+  .panel-header .back-btn {
+    all: unset; cursor: pointer; width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid var(--panel-edge); display: flex; align-items: center; justify-content: center;
+    color: var(--gold); font-size: 18px;
+  }
+  .panel-header h2 {
+    font-family: var(--font-display); font-weight: 700; letter-spacing: 2px;
+    font-size: clamp(22px,3.5vw,32px); margin: 0; color: var(--paper);
+  }
+  .panel-content { flex: 1; overflow-y: auto; max-width: 720px; }
+
+  .setting-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 0; border-bottom: 1px solid rgba(238,243,234,0.1);
+  }
+  .setting-row .label { font-size: 16px; letter-spacing: 0.5px; }
+  .setting-row .desc { font-size: 12px; color: rgba(238,243,234,0.45); margin-top: 3px; }
+
+  .toggle {
+    width: 48px; height: 26px; border-radius: 14px; background: rgba(238,243,234,0.15);
+    position: relative; cursor: pointer; transition: background 0.2s ease; flex-shrink: 0;
+  }
+  .toggle.on { background: var(--gold-dim); }
+  .toggle .knob {
+    position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--paper); transition: left 0.2s ease;
+  }
+  .toggle.on .knob { left: 25px; background: var(--gold); }
+
+  .slider-row input[type=range] {
+    width: 140px; accent-color: var(--gold);
+  }
+
+  .team-select-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px;
+    margin-top: 16px;
+  }
+  .team-card {
+    border: 1px solid var(--panel-edge); border-radius: 4px; padding: 14px 10px;
+    text-align: center; cursor: pointer; background: rgba(238,243,234,0.03);
+    transition: all 0.15s ease;
+  }
+  .team-card.selected { background: rgba(217,178,92,0.15); border-color: var(--gold); }
+  .team-card .dot { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 8px; }
+  .team-card .tname { font-family: var(--font-display); font-size: 14px; letter-spacing: 1px; }
+
+  .mode-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 14px;
+    margin-top: 8px;
+  }
+  .mode-card {
+    border: 1px solid var(--panel-edge); border-radius: 4px; padding: 22px 18px;
+    cursor: pointer; background: rgba(238,243,234,0.03); position: relative; overflow: hidden;
+    transition: all 0.15s ease;
+  }
+  .mode-card:hover, .mode-card:active { background: rgba(217,178,92,0.1); border-color: var(--gold); transform: translateY(-2px); }
+  .mode-card .mtitle {
+    font-family: var(--font-display); font-weight: 600; font-size: 19px; letter-spacing: 1px; color: var(--paper);
+    margin-bottom: 6px;
+  }
+  .mode-card .mdesc { font-size: 12.5px; color: rgba(238,243,234,0.5); line-height: 1.5; }
+  .mode-card .mtag {
+    position: absolute; top: 10px; right: 10px; font-size: 10px; letter-spacing: 1px;
+    color: var(--gold-dim); border: 1px solid var(--gold-dim); border-radius: 10px; padding: 2px 8px;
+  }
+  .mode-card.locked { opacity: 0.4; cursor: not-allowed; }
+  .mode-card.locked:hover { transform: none; background: rgba(238,243,234,0.03); border-color: var(--panel-edge); }
+
+  .start-btn {
+    all: unset; cursor: pointer; margin-top: 28px;
+    font-family: var(--font-display); font-weight: 700; letter-spacing: 3px; font-size: 16px;
+    color: var(--ink); background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    padding: 14px 36px; border-radius: 2px; display: inline-block;
+    box-shadow: 0 6px 24px rgba(217,178,92,0.25);
+  }
+  .start-btn:active { transform: scale(0.97); }
+
+  /* ============ HUD (in-match) ============ */
+  #hud { position: fixed; inset: 0; z-index: 50; pointer-events: none; display: none; }
+  #hud.active { display: block; }
+
+  .scoreboard {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: stretch;
+    background: var(--panel); border: 1px solid var(--panel-edge); border-top: none;
+    border-radius: 0 0 10px 10px; overflow: hidden;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    backdrop-filter: blur(4px);
+  }
+  .sb-team { display: flex; align-items: center; gap: 8px; padding: 8px 14px; }
+  .sb-team .sb-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .sb-team .sb-name { font-family: var(--font-display); font-size: clamp(12px,2vw,15px); letter-spacing: 1px; }
+  .sb-score {
+    display: flex; align-items: center; gap: 10px; padding: 8px 16px;
+    background: rgba(0,0,0,0.3); font-family: var(--font-display); font-weight: 700;
+    font-size: clamp(18px,3vw,24px); border-left: 1px solid var(--panel-edge); border-right: 1px solid var(--panel-edge);
+  }
+  .sb-clock {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px 14px;
+    font-family: var(--font-display); font-size: clamp(13px,2vw,16px); letter-spacing: 1px;
+  }
+  .sb-clock .half-tag { font-size: 9px; color: var(--gold); letter-spacing: 2px; margin-top: 1px; }
+
+  .match-event {
+    position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+    font-family: var(--font-display); font-weight: 700; letter-spacing: 3px;
+    font-size: clamp(22px,4.5vw,40px); color: var(--gold);
+    text-shadow: 0 4px 20px rgba(0,0,0,0.7);
+    opacity: 0; pointer-events: none; text-align: center;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  .match-event.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .match-event .sub-line { display:block; font-size: 0.4em; letter-spacing: 2px; color: var(--paper); margin-top: 4px; }
+
+  .stamina-strip {
+    position: absolute; top: 12px; left: 12px;
+    background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 6px;
+    padding: 8px 12px; display: flex; align-items: center; gap: 10px;
+    backdrop-filter: blur(4px);
+  }
+  .stamina-strip .pname { font-family: var(--font-display); font-size: 12px; letter-spacing: 1px; min-width: 60px; }
+  .stamina-strip .pos-tag { font-size: 9px; color: var(--gold-dim); border: 1px solid var(--gold-dim); border-radius: 8px; padding: 1px 6px; }
+  .stamina-bar-track { width: 70px; height: 6px; background: rgba(238,243,234,0.15); border-radius: 3px; overflow: hidden; }
+  .stamina-bar-fill { height: 100%; background: linear-gradient(90deg, #3ea15c, #6fd189); transition: width 0.2s ease, background 0.3s ease; }
+  .stamina-bar-fill.low { background: linear-gradient(90deg, #b23c3c, #d9683f); }
+
+  .power-meter {
+    position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%);
+    width: min(240px, 60vw); height: 14px; background: rgba(0,0,0,0.4);
+    border: 1px solid var(--panel-edge); border-radius: 8px; overflow: hidden;
+    opacity: 0; transition: opacity 0.15s ease;
+  }
+  .power-meter.show { opacity: 1; }
+  .power-meter .fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #3ea15c, var(--gold), var(--red));
+  }
+
+  .minimap {
+    position: absolute; top: 12px; right: 12px;
+    width: 130px; height: 90px; background: rgba(6,20,11,0.75);
+    border: 1px solid var(--panel-edge); border-radius: 6px; overflow: hidden;
+    backdrop-filter: blur(4px);
+  }
+  .minimap canvas { width: 100%; height: 100%; display: block; }
+
+  .pause-btn {
+    position: absolute; top: 12px; right: 152px;
+    width: 38px; height: 38px; border-radius: 8px;
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--paper); font-size: 16px; pointer-events: all; cursor: pointer;
+  }
+
+  /* ---- controls ---- */
+  .controls-layer { position: absolute; inset: 0; pointer-events: none; }
+  .joystick-zone {
+    position: absolute; left: clamp(20px, 4vw, 44px); bottom: clamp(20px, 4vh, 48px);
+    width: 130px; height: 130px; pointer-events: all;
+    touch-action: none;
+  }
+  .joystick-base {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: rgba(238,243,234,0.07); border: 1.5px solid rgba(238,243,234,0.25);
+  }
+  .joystick-thumb {
+    position: absolute; width: 54px; height: 54px; border-radius: 50%;
+    left: 50%; top: 50%; transform: translate(-50%,-50%);
+    background: rgba(217,178,92,0.85); border: 1px solid rgba(255,255,255,0.4);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+  }
+
+  .action-buttons {
+    position: absolute; right: clamp(16px, 3.5vw, 40px); bottom: clamp(16px, 3vh, 40px);
+    width: 190px; height: 190px; pointer-events: all;
+  }
+  .abtn {
+    position: absolute; width: 62px; height: 62px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 700; font-size: 13px; letter-spacing: 0.5px;
+    color: var(--paper); border: 1.5px solid rgba(255,255,255,0.35);
+    box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+    user-select: none; -webkit-user-select: none;
+  }
+  .abtn:active { transform: scale(0.92); }
+  .abtn.shoot { right: 0; top: 62px; background: rgba(192,57,43,0.82); }
+  .abtn.pass { right: 62px; top: 0; background: rgba(43,111,192,0.82); }
+  .abtn.through { left: 0; top: 62px; background: rgba(217,178,92,0.85); color: var(--ink); }
+  .abtn.cross { right: 62px; top: 124px; background: rgba(120,90,180,0.82); }
+  .abtn.sprint {
+    left: 50%; top: 50%; transform: translate(-50%,-50%);
+    width: 52px; height: 52px; background: rgba(255,255,255,0.12); font-size: 10px;
+  }
+
+  .switch-btn {
+    position: absolute; left: clamp(20px, 4vw, 44px); bottom: 168px;
+    width: 56px; height: 56px; border-radius: 50%; pointer-events: all;
+    background: rgba(238,243,234,0.1); border: 1.5px solid rgba(238,243,234,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-size: 10px; letter-spacing: 1px; color: var(--paper);
+  }
+  .switch-btn:active { background: rgba(217,178,92,0.3); }
+
+  .camera-btn {
+    position: absolute; top: 60px; right: 12px; pointer-events: all;
+    width: 38px; height: 38px; border-radius: 8px;
+    background: var(--panel); border: 1px solid var(--panel-edge);
+    display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--paper);
+  }
+
+  /* ---- pause overlay ---- */
+  #pauseOverlay {
+    position: fixed; inset: 0; z-index: 150; display: none;
+    background: rgba(4,8,5,0.88); backdrop-filter: blur(8px);
+    flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  }
+  #pauseOverlay.active { display: flex; }
+  #pauseOverlay h2 { font-family: var(--font-display); letter-spacing: 4px; font-size: 30px; color: var(--gold); margin: 0 0 20px; }
+  #pauseOverlay button {
+    all: unset; cursor: pointer; font-family: var(--font-display); letter-spacing: 2px; font-size: 16px;
+    color: var(--paper); border: 1px solid var(--panel-edge); padding: 12px 40px; border-radius: 2px; text-align: center;
+    width: 260px;
+  }
+  #pauseOverlay button:hover, #pauseOverlay button:active { background: rgba(217,178,92,0.15); border-color: var(--gold); }
+
+  /* ---- fulltime overlay ---- */
+  #fulltimeOverlay {
+    position: fixed; inset: 0; z-index: 150; display: none;
+    background: radial-gradient(ellipse at center, rgba(11,32,19,0.97), rgba(4,8,5,0.99));
+    flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center;
+    padding: 20px;
+  }
+  #fulltimeOverlay.active { display: flex; }
+  #fulltimeOverlay .ft-tag { letter-spacing: 6px; font-size: 13px; color: var(--gold); margin-bottom: 10px; }
+  #fulltimeOverlay .ft-score {
+    font-family: var(--font-display); font-weight: 700; font-size: clamp(48px,10vw,88px);
+    display: flex; align-items: center; gap: 24px; color: var(--paper);
+  }
+  #fulltimeOverlay .ft-score .ft-dash { color: var(--gold-dim); font-size: 0.7em; }
+  #fulltimeOverlay .ft-teams { display: flex; gap: 24px; font-size: 14px; letter-spacing: 2px; color: rgba(238,243,234,0.6); margin-bottom: 30px; }
+  #fulltimeOverlay .ft-btns { display: flex; gap: 14px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
+  #fulltimeOverlay button {
+    all: unset; cursor: pointer; font-family: var(--font-display); letter-spacing: 2px; font-size: 14px;
+    color: var(--ink); background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    padding: 12px 30px; border-radius: 2px;
+  }
+  #fulltimeOverlay button.ghost { background: transparent; color: var(--paper); border: 1px solid var(--panel-edge); }
+
+  /* ---- orientation notice ---- */
+  #rotateNotice {
+    position: fixed; inset: 0; z-index: 300; display: none;
+    background: var(--ink); color: var(--paper);
+    flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+    font-family: var(--font-display); letter-spacing: 2px; text-align: center; padding: 24px;
+  }
+  @media (max-aspect-ratio: 1/1) and (max-width: 900px) and (hover: none) {
+    #rotateNotice.mobile-portrait { display: flex; }
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 3px; }
+
+  @media (max-width: 560px) {
+    .action-buttons { width: 168px; height: 168px; }
+    .abtn { width: 56px; height: 56px; font-size: 11px; }
+    .abtn.pass { right: 56px; }
+    .abtn.through { top: 56px; }
+    .abtn.cross { right: 56px; top: 112px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl"></canvas>
+
+  <!-- LOADING -->
+  <div id="loading">
+    <div class="logo">STRIKE <span style="color:var(--paper)">ARENA</span></div>
+    <div class="sub">FOOTBALL&nbsp;&nbsp;3D</div>
+    <div class="bar-track"><div class="bar-fill" id="loadBar"></div></div>
+    <div class="pct" id="loadPct">LOADING PITCH — 0%</div>
+  </div>
+
+  <!-- MAIN MENU -->
+  <div id="menu" class="hidden">
+    <canvas id="menuCanvas"></canvas>
+    <div class="menu-top">
+      <div class="brand">
+        <div class="crest">SA</div>
+        <div class="name">STRIKE <span>ARENA</span></div>
+      </div>
+      <div style="font-size:11px;letter-spacing:2px;color:rgba(238,243,234,0.4);text-align:right">
+        SEASON 26/27<br/>v1.0
+      </div>
+    </div>
+
+    <div class="menu-body">
+      <div class="menu-title">PLAY<br/>THE<br/><span class="accent">BEAUTIFUL</span> GAME</div>
+      <div class="menu-kicker">REALTIME 3D FOOTBALL SIMULATION</div>
+
+      <nav class="menu-nav">
+        <button class="primary" data-go="mode"><span class="idx">01</span> PLAY</button>
+        <button data-go="team"><span class="idx">02</span> TEAM</button>
+        <button disabled><span class="idx">03</span> CAREER <span style="font-size:10px;margin-left:8px;color:var(--gold-dim)">SOON</span></button>
+        <button disabled><span class="idx">04</span> TOURNAMENT <span style="font-size:10px;margin-left:8px;color:var(--gold-dim)">SOON</span></button>
+        <button data-go="settings"><span class="idx">05</span> SETTINGS</button>
+      </nav>
+    </div>
+
+    <div class="menu-bottom">
+      <div>© STRIKE ARENA STUDIOS</div>
+      <div id="menuHint">TAP A MENU ITEM TO CONTINUE</div>
+    </div>
+  </div>
+
+  <!-- MODE SELECT -->
+  <div class="panel-screen" id="panelMode">
+    <div class="panel-header">
+      <button class="back-btn" data-back="menu">←</button>
+      <h2>SELECT MODE</h2>
+    </div>
+    <div class="panel-content">
+      <div class="mode-grid">
+        <div class="mode-card" data-mode="quick">
+          <div class="mtitle">QUICK MATCH</div>
+          <div class="mdesc">Vào trận ngay với đội hình bạn chọn. 2 hiệp x 4 phút, chọn AI đối thủ.</div>
+        </div>
+        <div class="mode-card locked">
+          <div class="mtag">SOON</div>
+          <div class="mtitle">CAREER MODE</div>
+          <div class="mdesc">Dẫn dắt đội bóng qua nhiều mùa giải, chuyển nhượng và phát triển cầu thủ.</div>
+        </div>
+        <div class="mode-card locked">
+          <div class="mtag">SOON</div>
+          <div class="mtitle">TOURNAMENT</div>
+          <div class="mdesc">Giải đấu loại trực tiếp 8 đội, tranh chức vô địch Strike Arena Cup.</div>
+        </div>
+        <div class="mode-card" data-mode="penalty">
+          <div class="mtitle">PENALTY SHOOTOUT</div>
+          <div class="mdesc">Loạt sút luân lưu 5 quả/đội. Căng thẳng, dứt khoát, một chọi một với thủ môn.</div>
+        </div>
+        <div class="mode-card" data-mode="training">
+          <div class="mtitle">TRAINING</div>
+          <div class="mdesc">Sân tập tự do — luyện sút, chuyền, rê bóng không giới hạn thời gian, không đối thủ.</div>
+        </div>
+        <div class="mode-card locked">
+          <div class="mtag">SOON</div>
+          <div class="mtitle">MULTIPLAYER</div>
+          <div class="mdesc">Đối đầu bạn bè qua mạng. Đang phát triển.</div>
+        </div>
+      </div>
+      <button class="start-btn" id="startMatchBtn">BẮT ĐẦU →</button>
+    </div>
+  </div>
+
+  <!-- TEAM SELECT -->
+  <div class="panel-screen" id="panelTeam">
+    <div class="panel-header">
+      <button class="back-btn" data-back="menu">←</button>
+      <h2>CHỌN ĐỘI BÓNG</h2>
+    </div>
+    <div class="panel-content">
+      <div style="font-size:13px;letter-spacing:1px;color:rgba(238,243,234,0.5);margin-bottom:4px">ĐỘI CỦA BẠN</div>
+      <div class="team-select-grid" id="myTeamGrid"></div>
+      <div style="font-size:13px;letter-spacing:1px;color:rgba(238,243,234,0.5);margin:22px 0 4px">ĐỘI ĐỐI THỦ</div>
+      <div class="team-select-grid" id="rivalTeamGrid"></div>
+
+      <div style="margin-top:26px">
+        <div style="font-size:13px;letter-spacing:1px;color:rgba(238,243,234,0.5);margin-bottom:10px">ĐỘ KHÓ AI</div>
+        <div class="team-select-grid" id="difficultyGrid" style="grid-template-columns:repeat(3,1fr);max-width:420px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="panel-screen" id="panelSettings">
+    <div class="panel-header">
+      <button class="back-btn" data-back="menu">←</button>
+      <h2>CÀI ĐẶT</h2>
+    </div>
+    <div class="panel-content">
+      <div class="setting-row">
+        <div><div class="label">Chất lượng đồ họa</div><div class="desc">Ảnh hưởng bóng đổ, số khán giả, độ phân giải</div></div>
+        <div style="display:flex;gap:6px" id="qualityRow"></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="label">Camera động (Dynamic Cam)</div><div class="desc">Camera tự chuyển góc theo tình huống bóng</div></div>
+        <div class="toggle on" id="toggleDynCam"><div class="knob"></div></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="label">Rung camera khi sút mạnh</div><div class="desc">Hiệu ứng camera shake khi dứt điểm lực lớn</div></div>
+        <div class="toggle on" id="toggleShake"><div class="knob"></div></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="label">Âm lượng nhạc nền</div></div>
+        <div class="slider-row"><input type="range" id="volMusic" min="0" max="100" value="55"/></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="label">Âm lượng hiệu ứng</div></div>
+        <div class="slider-row"><input type="range" id="volSfx" min="0" max="100" value="80"/></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="label">Hỗ trợ chuyền bóng</div><div class="desc">Tự động hướng đường chuyền tới đồng đội gần nhất</div></div>
+        <div class="toggle on" id="toggleAssist"><div class="knob"></div></div>
+      </div>
+      <div class="setting-row">
+        <div><div class="label">Điều khiển</div></div>
+        <div style="font-size:12px;color:rgba(238,243,234,0.5);text-align:right;max-width:220px">Joystick trái · nút phải · giữ SÚT để tăng lực</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="scoreboard">
+      <div class="sb-team"><div class="sb-dot" id="sbDotHome"></div><div class="sb-name" id="sbNameHome">HOME</div></div>
+      <div class="sb-score"><span id="sbScoreHome">0</span><span style="opacity:.4">–</span><span id="sbScoreAway">0</span></div>
+      <div class="sb-team"><div class="sb-name" id="sbNameAway">AWAY</div><div class="sb-dot" id="sbDotAway"></div></div>
+      <div class="sb-clock"><span id="sbClock">00:00</span><span class="half-tag" id="sbHalf">HIỆP 1</span></div>
+    </div>
+
+    <div class="match-event" id="matchEvent"></div>
+
+    <div class="stamina-strip">
+      <div>
+        <div class="pname" id="ctrlPName">—</div>
+        <div class="pos-tag" id="ctrlPPos">—</div>
+      </div>
+      <div class="stamina-bar-track"><div class="stamina-bar-fill" id="staminaFill" style="width:100%"></div></div>
+    </div>
+
+    <div class="minimap"><canvas id="minimapCanvas" width="260" height="180"></canvas></div>
+    <button class="pause-btn" id="pauseBtn">❚❚</button>
+    <button class="camera-btn" id="cameraBtn">📷</button>
+
+    <div class="power-meter" id="powerMeter"><div class="fill" id="powerFill"></div></div>
+
+    <div class="controls-layer">
+      <div class="joystick-zone" id="joyZone">
+        <div class="joystick-base"></div>
+        <div class="joystick-thumb" id="joyThumb"></div>
+      </div>
+
+      <button class="switch-btn" id="switchBtn">SWITCH</button>
+
+      <div class="action-buttons">
+        <div class="abtn pass" id="btnPass">CHUYỀN</div>
+        <div class="abtn through" id="btnThrough">CHỌC KHE</div>
+        <div class="abtn shoot" id="btnShoot">SÚT</div>
+        <div class="abtn cross" id="btnCross">TẠT</div>
+        <div class="abtn sprint" id="btnSprint">CHẠY</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAUSE -->
+  <div id="pauseOverlay">
+    <h2>TẠM DỪNG</h2>
+    <button id="resumeBtn">TIẾP TỤC</button>
+    <button id="restartBtn">CHƠI LẠI TRẬN</button>
+    <button id="quitBtn">VỀ MENU CHÍNH</button>
+  </div>
+
+  <!-- FULLTIME -->
+  <div id="fulltimeOverlay">
+    <div class="ft-tag">KẾT THÚC TRẬN ĐẤU</div>
+    <div class="ft-score">
+      <span id="ftHomeScore">0</span><span class="ft-dash">–</span><span id="ftAwayScore">0</span>
+    </div>
+    <div class="ft-teams"><span id="ftHomeName">HOME</span><span>vs</span><span id="ftAwayName">AWAY</span></div>
+    <div class="ft-btns">
+      <button id="ftRematch">ĐẤU LẠI</button>
+      <button class="ghost" id="ftMenu">VỀ MENU</button>
+    </div>
+  </div>
+
+  <div id="rotateNotice" class="mobile-portrait">
+    <div style="font-size:38px">📱↻</div>
+    <div>XOAY NGANG MÀN HÌNH<br/><span style="font-size:11px;letter-spacing:1px;opacity:.5">ĐỂ TRẢI NGHIỆM TỐT NHẤT</span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
